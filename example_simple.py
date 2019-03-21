@@ -20,16 +20,3 @@ if __name__ == '__main__':
   # print to console, and visualize
   print(rf)
   rf.show()
-
-
-  net = nn.Sequential(
-    nn.Conv2d(in_channels=3, out_channels=32, stride=2, kernel_size=3),
-    nn.ReLU(),
-    nn.Conv2d(in_channels=32, out_channels=10, kernel_size=3),
-  )
-
-  # compute receptive field for this input shape
-  rf = receptivefield(net, (1, 3, 32, 48))
-
-  # print to console, and visualize
-  print(rf)
