@@ -31,7 +31,7 @@ ReceptiveField(
 
 # Screenshot
 
-![Screenshot](/screenshot.png?raw=true)
+<img src="screen.png" width="600" />
 
 # Author
 
