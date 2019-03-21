@@ -31,6 +31,10 @@ ReceptiveField(
 
 # Screenshot
 
+`ReceptiveField.show` can be used to visualize the receptive field on a checkerboard image.
+Crosses denote the centers of receptive fields, and colored rectangles show their extent.
+Not all rectangles are plotted to avoid crowding the image.
+
 <img src="screen.png" width="600" />
 
 # Author
