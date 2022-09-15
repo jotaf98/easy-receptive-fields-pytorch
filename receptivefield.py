@@ -92,8 +92,15 @@ def receptivefield(net, input_shape, device='cpu'):
   Returns a ReceptiveField object."""
 
   if len(input_shape) < 4:
-    raise ValueError('Input shape must be at least 4-dimensional (N x C x H x W).')
-
+    raise ValueError("Input shape must be at least 4-dimensional (N x C x H x W).")
+  try:
+    param_device = next(net.parameters()).device
+    device = t.device(device)
+    if device.type != param_device.type or (device.index is not None and device.index != param_device.index):
+      raise ValueError("The input network's device and the receptive field function's device argument must be the same.")
+  except StopIteration:
+    pass
+  
   # make gradients of some problematic layers pass-through
   hooks = []
   def insert_hook(module):
@@ -155,7 +162,7 @@ def _project_rf(input, output, offset_x=0, offset_y=0, return_pos=False):
   pos[x_dim] = math.ceil(output.shape[x_dim] / 2) - 1 + offset_x
   pos[y_dim] = math.ceil(output.shape[y_dim] / 2) - 1 + offset_y
 
-  out_grad = t.zeros(output.shape)
+  out_grad = t.zeros_like(output)
   out_grad[tuple(pos)] = 1
 
   # clear gradient first
@@ -199,7 +206,7 @@ def _maxpool_passthrough_grad(self, grad_input, grad_output):
 
   # backprop through a nn.AvgPool2d with same args as nn.MaxPool2d
   with t.enable_grad():                               
-    input = t.ones(grad_input[0].shape, requires_grad=True)
+    input = t.ones_like(grad_input[0], requires_grad=True)
     output = nn.functional.avg_pool2d(input, self.kernel_size, self.stride, self.padding, self.ceil_mode)
     return t.autograd.grad(output, input, grad_output[0])
 
@@ -207,20 +214,23 @@ def _maxpool_passthrough_grad(self, grad_input, grad_output):
 def run_test():
   """Tests various combinations of inputs and checks that they are correct."""
   # this is easy to do for convolutions since the RF is known in closed form.
-  for kw in [1, 2, 3, 5]:  # kernel width
-    for sx in [1, 2, 3]:  # stride in x
-      for px in [1, 2, 3, 5]:  # padding in x
-        (kh, sy, py) = (kw + 1, sx + 1, px + 1)  # kernel/stride/pad in y
-        for width in range(kw + sx * 2, kw + 3 * sx + 1):  # enough width
-          for height in range(width + 1, width + sy + 1):
-            # create convolution and compute its RF
-            net = nn.Conv2d(3, 2, (kh, kw), (sy, sx), (py, px))
-            rf = receptivefield(net, (1, 3, height, width))
+  devices = ['cpu', 'cuda'] if t.cuda.is_available() else ['cpu']
+  for device in devices:
+    for kw in [1, 2, 3, 5]:  # kernel width
+      for sx in [1, 2, 3]:  # stride in x
+        for px in [1, 2, 3, 5]:  # padding in x
+          (kh, sy, py) = (kw + 1, sx + 1, px + 1)  # kernel/stride/pad in y
+          for width in range(kw + sx * 2, kw + 3 * sx + 1):  # enough width
+            for height in range(width + 1, width + sy + 1):
+              # create convolution and compute its RF
+              net = nn.Conv2d(3, 2, (kh, kw), (sy, sx), (py, px))
+              net.to(device)
+              rf = receptivefield(net, (1, 3, height, width), device=device)
 
-            print('Checking: ', rf)
-            assert rf.rfsize.w == kw and rf.rfsize.h == kh
-            assert rf.stride.x == sx and rf.stride.y == sy
-            assert rf.offset.x == -px and rf.offset.y == -py
+              print('Checking', device, ': ', rf)
+              assert rf.rfsize.w == kw and rf.rfsize.h == kh
+              assert rf.stride.x == sx and rf.stride.y == sy
+              assert rf.offset.x == -px and rf.offset.y == -py
   print('Done, all tests passed.')
 
 
